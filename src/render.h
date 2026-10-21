@@ -8,7 +8,6 @@
 #define DRAW_SEGS  70
 
 void render_init(void);                         /* palette */
-extern uint8_t half_rows;      /* experiment toggle (y= key) */
 extern uint16_t prof[4];       /* frame timing, 32768 Hz ticks: swap wait, road, other draw, physics */
 void render_race(const race_t *r, uint8_t show_fps, uint8_t fps, uint8_t show_ghost);
 void render_finish(const race_t *r, uint8_t new_best);       /* new_best: 0 no, 1 yes, 2 yes but save failed. last race frame + result panel */

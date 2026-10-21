@@ -43,7 +43,8 @@ static int16_t px[DRAW_SEGS + 2], py[DRAW_SEGS + 2], pw[DRAW_SEGS + 2], pclip[DR
 static int32_t xw[DRAW_SEGS + 2];
 
 static int clampi(int32_t v, int lim) { return v < -lim ? -lim : v > lim ? lim : (int)v; }
-static int32_t pscale(int32_t dz) { return ((int32_t)FOCAL << PSHIFT) / (dz < NEAR_DZ ? NEAR_DZ : dz); }
+/* 24-bit division (FOCAL << PSHIFT fits): the 32-bit one costs ~80 us on hardware, and this runs 71x per frame */
+static int32_t pscale(int32_t dz) { return dz > 4000000 ? 0 : (int)((int)FOCAL << PSHIFT) / (int)(dz < NEAR_DZ ? NEAR_DZ : dz); }
 static int proj_y(int32_t sc, int32_t dy) { return clampi(HORIZON_Y + (((CAM_H - dy) * sc) >> PSHIFT), 2000); }
 int project_y(int32_t dz, int32_t dy) { return proj_y(pscale(dz), dy); }
 
@@ -60,18 +61,16 @@ void render_init(void)
     sky_scroll = 0; prev_x = 0; flash = 0;
 }
 
-uint8_t half_rows;      /* experiment: road spans 2 rows tall */
 uint16_t prof[4];       /* last frame, clock() ticks: swap wait, road, rest of draw, physics (set by main) */
-static uint8_t rows_h = 1;
 
-static void span(int x0, int x1, uint8_t y)
+/* Writes straight into the draw buffer: each graphx call costs ~60 us on hardware (library runs from flash), a memset almost nothing. */
+static void span(int x0, int x1, uint8_t *row, uint8_t col)
 {
     if (x0 < 0) x0 = 0;
     if (x1 > GFX_LCD_WIDTH) x1 = GFX_LCD_WIDTH;
-    if (x1 <= x0) return;
-    if (rows_h == 1) gfx_HorizLine_NoClip(x0, y, x1 - x0);
-    else gfx_FillRectangle_NoClip(x0, y, x1 - x0, rows_h);
+    if (x1 > x0) memset(row + x0, col, (size_t)(x1 - x0));
 }
+static void fill_rows(int y0, int y1, uint8_t col) { if (y1 > y0) memset(gfx_vbuffer[y0], col, (size_t)(y1 - y0) * GFX_LCD_WIDTH); }
 
 /* car shape in 1/256 scale units, base center (cx, by); clipped routines so far/occluded ghosts are safe */
 static void car_rect(int cx, int by, int s, int x0, int y0, int x1, int y1)
@@ -159,56 +158,48 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
     for (n = 0; n < DRAW_SEGS && clip > 0; n++) {
         int32_t s = b + n;
         int y1 = py[n], y2 = py[n + 1], h, top, row;
-        int32_t inv, dx8, dw8, x8, w8;
-        uint8_t gate = 0, fin = s == t->n_segs - 1;
+        int32_t inv;
+        int dx8, dw8, x8, w8;                     /* 24-bit native on CE: |values| < 2^22 since px/pw are clamped to 4000 */
+        uint8_t gate = 0, fin = s == t->n_segs - 1, grass, rum;
         if (n && ++ph3 == 3) { ph3 = 0; alt ^= 1; }
+        grass = alt ? C_GRASS1 : C_GRASS2;
+        rum = alt ? C_RUM1 : C_RUM2;
         pclip[n] = (int16_t)clip;
         if (y2 >= clip || y2 >= y1) continue;       /* hidden behind nearer road, below screen, or facing away (h <= 0) */
         for (int i = 0; i < t->n_cp; i++) gate |= s == t->cp_seg[i];
         h = y1 - y2;
         inv = h < 256 ? recip[h] : 65536L / h;
-        dx8 = ((int32_t)(px[n + 1] - px[n]) * inv) >> 8;
-        dw8 = ((int32_t)(pw[n + 1] - pw[n]) * inv) >> 8;
-        x8 = ((int32_t)px[n] << 8) + dx8 * (y1 - clip + 1);
-        w8 = ((int32_t)pw[n] << 8) + dw8 * (y1 - clip + 1);
+        dx8 = (int)(((int32_t)(px[n + 1] - px[n]) * inv) >> 8);
+        dw8 = (int)(((int32_t)(pw[n + 1] - pw[n]) * inv) >> 8);
+        x8 = (px[n] << 8) + dx8 * (y1 - clip + 1);
+        w8 = (pw[n] << 8) + dw8 * (y1 - clip + 1);
         top = y2 < 0 ? 0 : y2;
-        int step = half_rows ? 2 : 1;
-        for (row = clip - 1; row >= top; row -= step, x8 += dx8 * step, w8 += dw8 * step) {
-            int xc = (int)(x8 >> 8), w = (int)(w8 >> 8), rw = (w >> 3) + 1;
-            uint8_t y = (uint8_t)(row - step + 1 < 0 ? 0 : row - step + 1);   /* a pair may spill one row into the next region; it's redrawn */
-            rows_h = (uint8_t)(row - y + 1);
-            gfx_SetColor(alt ? C_GRASS1 : C_GRASS2);
-            span(0, xc - w - rw, y);
-            span(xc + w + rw, GFX_LCD_WIDTH, y);
-            gfx_SetColor(alt ? C_RUM1 : C_RUM2);
-            span(xc - w - rw, xc - w, y);
-            span(xc + w, xc + w + rw, y);
+        for (row = clip - 1; row >= top; row--, x8 += dx8, w8 += dw8) {
+            int xc = x8 >> 8, w = w8 >> 8, rw = (w >> 3) + 1;
+            uint8_t *rp = gfx_vbuffer[row];
+            span(0, xc - w - rw, rp, grass);
+            span(xc + w + rw, GFX_LCD_WIDTH, rp, grass);
+            span(xc - w - rw, xc - w, rp, rum);
+            span(xc + w, xc + w + rw, rp, rum);
             if (fin) {                              /* checkered: 8 squares, 2 rows of them */
                 int q = w >> 2, k;
                 uint8_t ph = (uint8_t)((y1 - row) * 2 < h);
-                for (k = 0; k < 8; k++) {
-                    gfx_SetColor(((k + ph) & 1) ? C_WHITE : C_BLACK);
-                    span(xc - w + k * q, k == 7 ? xc + w : xc - w + (k + 1) * q, y);
-                }
+                for (k = 0; k < 8; k++)
+                    span(xc - w + k * q, k == 7 ? xc + w : xc - w + (k + 1) * q, rp, ((k + ph) & 1) ? C_WHITE : C_BLACK);
             } else if (gate) {
-                gfx_SetColor(C_GATE);
-                span(xc - w, xc + w, y);
+                span(xc - w, xc + w, rp, C_GATE);
             } else if (alt) {
                 int lw = (w >> 5) + 1;
-                gfx_SetColor(C_ROAD1);
-                span(xc - w, xc - lw, y);
-                span(xc + lw, xc + w, y);
-                gfx_SetColor(C_LANE);
-                span(xc - lw, xc + lw, y);
+                span(xc - w, xc - lw, rp, C_ROAD1);
+                span(xc + lw, xc + w, rp, C_ROAD1);
+                span(xc - lw, xc + lw, rp, C_LANE);
             } else {
-                gfx_SetColor(C_ROAD2);
-                span(xc - w, xc + w, y);
+                span(xc - w, xc + w, rp, C_ROAD2);
             }
         }
         clip = top;
     }
     for (; n <= DRAW_SEGS; n++) pclip[n] = (int16_t)clip;
-    rows_h = 1;
     prof[1] = (uint16_t)(clock() - t1);
 
     sky_scroll += (int32_t)seg_curve(t, cs) * (c->speed >> 8) * 2;
@@ -216,20 +207,17 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
     if (clip > 0) {
         int a = clip < SKY_BAND ? clip : SKY_BAND, hz = clip < HORIZON_Y ? clip : HORIZON_Y;
         int off;
-        gfx_SetColor(C_SKY1);
-        gfx_FillRectangle_NoClip(0, 0, GFX_LCD_WIDTH, a);
-        if (hz > SKY_BAND) { gfx_SetColor(C_SKY2); gfx_FillRectangle_NoClip(0, SKY_BAND, GFX_LCD_WIDTH, hz - SKY_BAND); }
-        if (clip > HORIZON_Y) { gfx_SetColor(C_FAR); gfx_FillRectangle_NoClip(0, HORIZON_Y, GFX_LCD_WIDTH, clip - HORIZON_Y); }
+        fill_rows(0, a, C_SKY1);
+        fill_rows(SKY_BAND, hz, C_SKY2);
+        fill_rows(HORIZON_Y, clip, C_FAR);
         off = (int)(((sky_scroll >> 8) % GFX_LCD_WIDTH + GFX_LCD_WIDTH) % GFX_LCD_WIDTH);
-        if (hz > HORIZON_Y - 36) {
-            gfx_SetClipRegion(0, 0, GFX_LCD_WIDTH, hz);
-            gfx_SetColor(C_MOUNT);
-            for (unsigned i = 0; i < sizeof MOUNTS / sizeof MOUNTS[0]; i++)
-                for (int rep = 0; rep < 2; rep++) {
-                    int mx = MOUNTS[i][0] - off + rep * GFX_LCD_WIDTH;
-                    gfx_FillTriangle(mx - MOUNTS[i][1], HORIZON_Y, mx, HORIZON_Y - MOUNTS[i][2], mx + MOUNTS[i][1], HORIZON_Y);
-                }
-        }
+        for (unsigned i = 0; i < sizeof MOUNTS / sizeof MOUNTS[0]; i++)
+            for (int rep = 0; rep < 2; rep++) {   /* triangle as row spans, clipped above the road (rows < hz) */
+                int mx = MOUNTS[i][0] - off + rep * GFX_LCD_WIDTH, mh = MOUNTS[i][2], top = HORIZON_Y - mh;
+                int step = (MOUNTS[i][1] << 8) / mh, hw8 = 0;
+                for (int y = top; y < hz; y++, hw8 += step)
+                    span(mx - (hw8 >> 8), mx + (hw8 >> 8) + 1, gfx_vbuffer[y], C_MOUNT);
+            }
     }
 
     /* sprites far-to-near, each clipped above the nearer road it stands behind */
@@ -298,11 +286,11 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
                      r->last_split_delta < 0 ? C_GREEN : r->last_split_delta > 0 ? C_RED : C_WHITE);
         }
         if (show_fps) {
-            char pl[32], *p = pl;   /* up to "W99999 R99999 O99999 P99999 H" */
+            char pl[32], *p = pl;   /* up to "W99999 R99999 O99999 P99999 " */
             static const char tag[4] = { 'W', 'R', 'O', 'P' };   /* ms: swap wait, road, other drawing, physics */
             u2s(line, fps); hud_text(line, -1, 4, C_WHITE);
             for (int i = 0; i < 4; i++) { *p++ = tag[i]; p = u2s(p, (unsigned)(((uint32_t)prof[i] * 1000) >> 15)); *p++ = ' '; }
-            *p++ = half_rows ? 'H' : ' '; *p = 0;
+            *p = 0;
             hud_text(pl, 4, 32, C_WHITE);
         }
     }

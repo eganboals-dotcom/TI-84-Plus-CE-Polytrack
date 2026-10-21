@@ -10,7 +10,7 @@
 #define MAX_CATCHUP 4
 
 enum { K_DOWN = 1, K_LEFT = 2, K_RIGHT = 4, K_UP = 8, K_2ND = 16, K_ALPHA = 32, K_MODE = 64,
-       K_CLEAR = 128, K_ENTER = 256, K_GRAPH = 512, K_YEQU = 1024 };
+       K_CLEAR = 128, K_ENTER = 256, K_GRAPH = 512 };
 
 /* static: record_t is ~4.5 KB and the CE stack ~4 KB. race is extern so the host sim can script against it. */
 static track_t trk;
@@ -27,7 +27,6 @@ static void scan(void)          /* once per frame */
     if (kb_Data[1] & kb_2nd) k |= K_2ND;
     if (kb_Data[1] & kb_Mode) k |= K_MODE;
     if (kb_Data[1] & kb_Graph) k |= K_GRAPH;
-    if (kb_Data[1] & kb_Yequ) k |= K_YEQU;
     if (kb_Data[2] & kb_Alpha) k |= K_ALPHA;
     if (kb_Data[6] & kb_Enter) k |= K_ENTER;
     if (kb_Data[6] & kb_Clear) k |= K_CLEAR;
@@ -86,7 +85,6 @@ static void play(uint8_t idx)
             if (pressed & K_CLEAR) return;
             if (pressed & K_MODE) { race_start(&race, &trk, &best); acc = 0; }   /* instant restart, same best */
             if (pressed & K_GRAPH) show_fps ^= 1;
-            if (pressed & K_YEQU) half_rows ^= 1;
             if (keys & (K_2ND | K_UP)) in |= IN_GAS;
             if (keys & (K_ALPHA | K_DOWN)) in |= IN_BRAKE;
             if (keys & K_LEFT) in |= IN_LEFT;
