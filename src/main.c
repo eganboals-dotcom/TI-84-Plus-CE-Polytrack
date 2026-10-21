@@ -108,6 +108,7 @@ int main(void)
     gfx_Begin();
     render_init();
     ti_SetGCBehavior(gfx_End, gfx_Begin);   /* let the OS draw its GC screen in its own mode; finish() restores ours */
+    scan();                                 /* the enter that launched the program is still held: don't count it as a menu press */
     while ((sel = menu((uint8_t)sel)) >= 0) play((uint8_t)sel);
     gfx_End();
     return 0;
