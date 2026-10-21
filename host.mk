@@ -1,7 +1,7 @@
 # Host build for logic tests. `sim` target arrives in Task 5.
 CC = gcc
 CFLAGS = -std=c99 -Wall -Wextra -Werror -O1 -Isrc
-LOGIC = src/track.c src/physics.c
+LOGIC = src/track.c src/physics.c src/race.c
 TESTS = $(wildcard tests/*.c)
 
 .PHONY: test

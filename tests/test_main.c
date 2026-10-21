@@ -13,6 +13,13 @@ void test_braked_entry_holds_line(void);
 void test_wall_slows(void);
 void test_fractional_z(void);
 void test_uphill_slows(void);
+void test_pack_roundtrip(void);
+void test_ghost_replays_exactly(void);
+void test_checkpoint_once(void);
+void test_finish_sets_ticks(void);
+void test_cap_run(void);
+void test_format(void);
+void test_split_delta(void);
 int main(void)
 {
     test_all_tracks_build();
@@ -27,6 +34,13 @@ int main(void)
     test_wall_slows();
     test_fractional_z();
     test_uphill_slows();
+    test_pack_roundtrip();
+    test_ghost_replays_exactly();
+    test_checkpoint_once();
+    test_finish_sets_ticks();
+    test_cap_run();
+    test_format();
+    test_split_delta();
     printf("%d failures\n", g_fail);
     return g_fail != 0;
 }
