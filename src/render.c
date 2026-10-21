@@ -2,6 +2,7 @@
    filled as one set of horizontal spans per scanline (no pixel loops in C). */
 #include <graphx.h>
 #include <string.h>
+#include <time.h>
 #include "render.h"
 
 #define FOCAL     200      /* px per world unit at dz = 1 */
@@ -59,11 +60,17 @@ void render_init(void)
     sky_scroll = 0; prev_x = 0; flash = 0;
 }
 
+uint8_t half_rows;      /* experiment: road spans 2 rows tall */
+uint16_t prof[4];       /* last frame, clock() ticks: swap wait, road, rest of draw, physics (set by main) */
+static uint8_t rows_h = 1;
+
 static void span(int x0, int x1, uint8_t y)
 {
     if (x0 < 0) x0 = 0;
     if (x1 > GFX_LCD_WIDTH) x1 = GFX_LCD_WIDTH;
-    if (x1 > x0) gfx_HorizLine_NoClip(x0, y, x1 - x0);
+    if (x1 <= x0) return;
+    if (rows_h == 1) gfx_HorizLine_NoClip(x0, y, x1 - x0);
+    else gfx_FillRectangle_NoClip(x0, y, x1 - x0, rows_h);
 }
 
 /* car shape in 1/256 scale units, base center (cx, by); clipped routines so far/occluded ghosts are safe */
@@ -126,6 +133,10 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
     int32_t road_y = seg_y(t, cs) + (seg_y(t, cs + 1) - seg_y(t, cs)) * (int32_t)(c->z - cs * SEG_LEN) / SEG_LEN;
     int clip = GFX_LCD_HEIGHT;
     int n;
+    clock_t t0 = clock(), t1;
+    gfx_Wait();
+    t1 = clock();
+    prof[0] = (uint16_t)(t1 - t0);
 
     /* Lou's curves: lateral world offset of each boundary, relative to the camera's heading */
     {
@@ -161,9 +172,11 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
         x8 = ((int32_t)px[n] << 8) + dx8 * (y1 - clip + 1);
         w8 = ((int32_t)pw[n] << 8) + dw8 * (y1 - clip + 1);
         top = y2 < 0 ? 0 : y2;
-        for (row = clip - 1; row >= top; row--, x8 += dx8, w8 += dw8) {
+        int step = half_rows ? 2 : 1;
+        for (row = clip - 1; row >= top; row -= step, x8 += dx8 * step, w8 += dw8 * step) {
             int xc = (int)(x8 >> 8), w = (int)(w8 >> 8), rw = (w >> 3) + 1;
-            uint8_t y = (uint8_t)row;
+            uint8_t y = (uint8_t)(row - step + 1 < 0 ? 0 : row - step + 1);   /* a pair may spill one row into the next region; it's redrawn */
+            rows_h = (uint8_t)(row - y + 1);
             gfx_SetColor(alt ? C_GRASS1 : C_GRASS2);
             span(0, xc - w - rw, y);
             span(xc + w + rw, GFX_LCD_WIDTH, y);
@@ -195,6 +208,8 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
         clip = top;
     }
     for (; n <= DRAW_SEGS; n++) pclip[n] = (int16_t)clip;
+    rows_h = 1;
+    prof[1] = (uint16_t)(clock() - t1);
 
     sky_scroll += (int32_t)seg_curve(t, cs) * (c->speed >> 8) * 2;
     /* sky + distant ground only in rows the road left unpainted */
@@ -282,7 +297,14 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
             hud_text(buf, GFX_LCD_WIDTH / 2 - (int)gfx_GetStringWidth(buf) / 2 - 3, 40,
                      r->last_split_delta < 0 ? C_GREEN : r->last_split_delta > 0 ? C_RED : C_WHITE);
         }
-        if (show_fps) { u2s(line, fps); hud_text(line, -1, 4, C_WHITE); }
+        if (show_fps) {
+            char pl[32], *p = pl;   /* up to "W99999 R99999 O99999 P99999 H" */
+            static const char tag[4] = { 'W', 'R', 'O', 'P' };   /* ms: swap wait, road, other drawing, physics */
+            u2s(line, fps); hud_text(line, -1, 4, C_WHITE);
+            for (int i = 0; i < 4; i++) { *p++ = tag[i]; p = u2s(p, (unsigned)(((uint32_t)prof[i] * 1000) >> 15)); *p++ = ' '; }
+            *p++ = half_rows ? 'H' : ' '; *p = 0;
+            hud_text(pl, 4, 32, C_WHITE);
+        }
     }
 
     if (c->wall_hit) flash = 6;
@@ -299,7 +321,9 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
 void render_race(const race_t *r, uint8_t show_fps, uint8_t fps, uint8_t ghost)
 {
     show_ghost = ghost;
+    clock_t t = clock();
     draw_race(r, show_fps, fps);
+    prof[2] = (uint16_t)(clock() - t - prof[0] - prof[1]);
     gfx_SwapDraw();
 }
 

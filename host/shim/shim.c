@@ -90,6 +90,7 @@ void gfx_Begin(void) { vis = 0; to_buffer = 0; }
 void gfx_End(void) {}
 void gfx_SetDraw(uint8_t loc) { to_buffer = loc == gfx_buffer; }
 void gfx_SwapDraw(void) { vis = 1 - vis; }
+void gfx_Wait(void) {}
 void gfx_SetPalette(const void *p, uint24_t size, uint8_t off) { memcpy(&pal[off], p, size); }
 uint8_t gfx_SetColor(uint8_t i) { uint8_t o = color; color = i; return o; }
 void gfx_FillScreen(uint8_t i) { memset(DRAWBUF, i, sizeof vram[0]); }

@@ -15,6 +15,7 @@ void gfx_Begin(void);
 void gfx_End(void);
 void gfx_SetDraw(uint8_t location);
 void gfx_SwapDraw(void);
+void gfx_Wait(void);
 void gfx_SetPalette(const void *palette, uint24_t size, uint8_t offset);
 uint8_t gfx_SetColor(uint8_t index);
 void gfx_FillScreen(uint8_t index);
