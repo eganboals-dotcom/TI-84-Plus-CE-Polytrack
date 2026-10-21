@@ -20,6 +20,9 @@ void test_finish_sets_ticks(void);
 void test_cap_run(void);
 void test_format(void);
 void test_split_delta(void);
+void test_roundtrip(void);
+void test_load_rejects_corrupt(void);
+void test_save_keeps_old_on_failure(void);
 int main(void)
 {
     test_all_tracks_build();
@@ -41,6 +44,9 @@ int main(void)
     test_cap_run();
     test_format();
     test_split_delta();
+    test_roundtrip();
+    test_load_rejects_corrupt();
+    test_save_keeps_old_on_failure();
     printf("%d failures\n", g_fail);
     return g_fail != 0;
 }
