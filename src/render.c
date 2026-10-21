@@ -113,7 +113,7 @@ static char *u2s(char *p, unsigned v)   /* writes digits + NUL, returns end */
     return p;
 }
 
-void render_race(const race_t *r, uint8_t show_fps, uint8_t fps)
+static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
 {
     const track_t *t = r->track;
     const car_t *c = &r->car;
@@ -150,7 +150,7 @@ void render_race(const race_t *r, uint8_t show_fps, uint8_t fps)
         uint8_t gate = 0, fin = s == t->n_segs - 1;
         if (n && ++ph3 == 3) { ph3 = 0; alt ^= 1; }
         pclip[n] = (int16_t)clip;
-        if (y2 >= clip) continue;                   /* hidden behind nearer road, or below screen */
+        if (y2 >= clip || y2 >= y1) continue;       /* hidden behind nearer road, below screen, or facing away (h <= 0) */
         for (int i = 0; i < t->n_cp; i++) gate |= s == t->cp_seg[i];
         h = y1 - y2;
         inv = h < 256 ? recip[h] : 65536L / h;
@@ -292,5 +292,52 @@ void render_race(const race_t *r, uint8_t show_fps, uint8_t fps)
         gfx_FillRectangle_NoClip(0, 4, 4, GFX_LCD_HEIGHT - 8);
         gfx_FillRectangle_NoClip(GFX_LCD_WIDTH - 4, 4, 4, GFX_LCD_HEIGHT - 8);
     }
+}
+
+void render_race(const race_t *r, uint8_t show_fps, uint8_t fps)
+{
+    draw_race(r, show_fps, fps);
+    gfx_SwapDraw();
+}
+
+static void center_text(const char *s, int y, uint8_t fg) { hud_text(s, GFX_LCD_WIDTH / 2 - 3 - (int)gfx_GetStringWidth(s) / 2, y, fg); }
+
+void render_finish(const race_t *r, uint8_t new_best)
+{
+    char buf[12], line[20];
+    draw_race(r, 0, 0);
+    gfx_SetColor(C_HUD);
+    gfx_FillRectangle_NoClip(60, 70, 200, 76);
+    if (r->finished) {
+        format_time(buf, r->run.ticks);
+        strcpy(line, "FINISH  ");
+        strcat(line, buf);
+        center_text(line, 78, C_WHITE);
+        if (new_best) center_text("NEW BEST!", 96, C_GREEN);
+        else {
+            int32_t d = (int32_t)r->run.ticks - r->best->ticks;   /* not new best => a best exists */
+            buf[0] = d < 0 ? '-' : '+';
+            format_time(buf + 1, (uint16_t)(d < 0 ? -d : d));
+            center_text(buf, 96, d < 0 ? C_GREEN : d > 0 ? C_RED : C_WHITE);
+        }
+    } else center_text("TIME UP", 78, C_RED);
+    center_text("2ND RETRY  CLEAR MENU", 122, C_WHITE);
+    gfx_SwapDraw();
+}
+
+void render_menu(uint8_t sel, const uint16_t *best_ticks)
+{
+    char buf[10];
+    gfx_FillScreen(C_SKY1);
+    center_text("TIME TRIAL", 16, C_GATE);
+    for (uint8_t i = 0; i < N_TRACKS; i++) {
+        int y = 50 + i * 24;
+        uint8_t fg = i == sel ? C_GATE : C_WHITE;
+        if (i == sel) { gfx_SetColor(C_GATE); gfx_FillRectangle_NoClip(20, y + 1, 6, 10); }
+        hud_text(TRACKS[i].name, 32, y, fg);
+        if (best_ticks[i]) format_time(buf, best_ticks[i]); else strcpy(buf, "--:--.--");
+        hud_text(buf, 220, y, fg);
+    }
+    center_text("2ND RACE  CLEAR QUIT", 214, C_WHITE);
     gfx_SwapDraw();
 }

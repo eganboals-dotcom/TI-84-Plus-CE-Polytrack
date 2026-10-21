@@ -15,5 +15,6 @@ uint16_t ti_GetSize(uint8_t handle);
 int ti_SetArchiveStatus(uint8_t archive, uint8_t handle);   /* 0 on failure */
 #define ti_SetArchiveStatus(archive, handle) ti_SetArchiveStatus((bool)(archive), (handle))
 int ti_Delete(const char *name);   /* 0 on failure */
+void ti_SetGCBehavior(void (*before)(void), void (*after)(void));   /* no GC on host: no-op */
 uint8_t ti_Rename(const char *old_name, const char *new_name);   /* 0 ok, 1 exists, 2 other */
 #endif

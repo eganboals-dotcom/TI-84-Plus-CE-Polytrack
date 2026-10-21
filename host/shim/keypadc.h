@@ -5,8 +5,11 @@
 typedef uint8_t kb_key_t;
 typedef uint16_t kb_lkey_t;
 extern uint8_t kb_Data[8];
-void kb_Scan(void);
+void kb_Scan(void);   /* calls shim_kb_hook if set (sim feeds scripted keys there) */
+extern void (*shim_kb_hook)(void);
+extern long shim_ticks;   /* fake 32768 Hz clock() for main.c built with -Dclock=shim_clock */
 #define kb_IsDown(lkey) (kb_Data[(lkey) >> 8] & (lkey))
+#define kb_Graph (1<<0)
 #define kb_2nd   (1<<5)
 #define kb_Mode  (1<<6)
 #define kb_Del   (1<<7)

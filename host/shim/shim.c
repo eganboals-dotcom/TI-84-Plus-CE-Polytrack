@@ -65,13 +65,18 @@ uint8_t ti_Rename(const char *o, const char *n)
     return rename(a, b) == 0 ? 0 : 2;
 }
 
+void ti_SetGCBehavior(void (*before)(void), void (*after)(void)) { (void)before; (void)after; }
+
 /* ---- graphx ---- */
 #include <assert.h>
 #include "graphx.h"
 #include "keypadc.h"
 
 uint8_t kb_Data[8];
-void kb_Scan(void) {}
+void (*shim_kb_hook)(void);
+long shim_ticks;
+void kb_Scan(void) { if (shim_kb_hook) shim_kb_hook(); }
+long shim_clock(void) { return shim_ticks; }   /* same type as host clock_t */
 
 static uint8_t vram[2][240][320];
 static uint16_t pal[256];

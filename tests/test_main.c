@@ -24,6 +24,7 @@ void test_roundtrip(void);
 void test_load_rejects_corrupt(void);
 void test_save_keeps_old_on_failure(void);
 void test_projection(void);
+void test_every_track_finishable(void);
 int main(void)
 {
     test_all_tracks_build();
@@ -49,6 +50,7 @@ int main(void)
     test_load_rejects_corrupt();
     test_save_keeps_old_on_failure();
     test_projection();
+    test_every_track_finishable();
     printf("%d failures\n", g_fail);
     return g_fail != 0;
 }
