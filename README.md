@@ -41,7 +41,3 @@ Tracks: Warmup, Rolling Hills, Hairpin Alley, Canyon Run, Twin Peaks, The Gauntl
 - While saving, the calculator may ask "Garbage Collect?". Answer Yes.
 - Saves are kept even when the calculator's memory is cleared.
 - To reset the bests, delete the saved files `RCRSV0` to `RCRSV5` from the calculator's memory.
-
-## If it's choppy
-
-Press `graph` to show the fps number in the corner, then tell me the number.
