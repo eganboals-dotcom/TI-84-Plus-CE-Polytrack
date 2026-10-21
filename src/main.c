@@ -17,7 +17,7 @@ static track_t trk;
 static record_t best;
 race_t race;
 static uint16_t keys, pressed, menu_best[TRACK_COUNT];
-static uint8_t show_fps;
+static uint8_t show_fps, show_ghost = 1;
 
 static void scan(void)          /* once per frame */
 {
@@ -44,7 +44,8 @@ static int8_t menu(uint8_t sel)  /* chosen track, or -1 to quit */
         if (pressed & K_DOWN) { sel = sel + 1 < N_TRACKS ? sel + 1 : 0; dirty = 1; }
         if (pressed & (K_2ND | K_ENTER)) return (int8_t)sel;
         if (pressed & K_CLEAR) return -1;
-        if (dirty) { render_menu(sel, menu_best); dirty = 0; }
+        if (pressed & (K_LEFT | K_RIGHT)) { show_ghost ^= 1; dirty = 1; }
+        if (dirty) { render_menu(sel, menu_best, show_ghost); dirty = 0; }
     }
 }
 
@@ -96,7 +97,7 @@ static void play(uint8_t idx)
             race.car.wall_hit = wall;                /* latch: a hit on any of this frame's ticks flashes */
             frames++;
             if ((uint32_t)(now - sec) >= (uint32_t)CLK) { fps = frames; frames = 0; sec = now; }
-            render_race(&race, show_fps, fps);
+            render_race(&race, show_fps, fps, show_ghost);
         }
     } while (finish(idx));
 }

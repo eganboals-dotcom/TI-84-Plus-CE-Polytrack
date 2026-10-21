@@ -30,6 +30,7 @@ You need TI Connect CE on your computer.
 | clear | Go back to the menu (in the menu, quits the game) |
 | graph | Show or hide the frame rate (fps) |
 | ↑ / ↓ (menu) | Pick a track |
+| ← / → (menu) | Turn the ghost car on or off |
 | 2nd or enter (menu) | Start the track |
 
 Tracks: Warmup, Rolling Hills, Hairpin Alley, Canyon Run, Twin Peaks, The Gauntlet.

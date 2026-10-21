@@ -113,6 +113,8 @@ static char *u2s(char *p, unsigned v)   /* writes digits + NUL, returns end */
     return p;
 }
 
+static uint8_t show_ghost = 1;   /* last setting from render_race; the finish screen reuses it */
+
 static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
 {
     const track_t *t = r->track;
@@ -219,7 +221,7 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
     {
         int32_t gdz = r->ghost.z - cam_z + rem;
         int gn = -1, gf = 0;
-        if (r->best && r->best->ticks && r->ghost.z > c->z && gdz < (int32_t)DRAW_SEGS * SEG_LEN) {
+        if (show_ghost && r->best && r->best->ticks && r->ghost.z > c->z && gdz < (int32_t)DRAW_SEGS * SEG_LEN) {
             gn = (int)(gdz / SEG_LEN);
             gf = (int)(gdz % SEG_LEN);
         }
@@ -294,8 +296,9 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
     }
 }
 
-void render_race(const race_t *r, uint8_t show_fps, uint8_t fps)
+void render_race(const race_t *r, uint8_t show_fps, uint8_t fps, uint8_t ghost)
 {
+    show_ghost = ghost;
     draw_race(r, show_fps, fps);
     gfx_SwapDraw();
 }
@@ -326,7 +329,7 @@ void render_finish(const race_t *r, uint8_t new_best)
     gfx_SwapDraw();
 }
 
-void render_menu(uint8_t sel, const uint16_t *best_ticks)
+void render_menu(uint8_t sel, const uint16_t *best_ticks, uint8_t show_ghost)
 {
     char buf[10];
     gfx_FillScreen(C_SKY1);
@@ -339,6 +342,7 @@ void render_menu(uint8_t sel, const uint16_t *best_ticks)
         if (best_ticks[i]) format_time(buf, best_ticks[i]); else strcpy(buf, "--:--.--");
         hud_text(buf, 220, y, fg);
     }
-    center_text("2ND RACE  CLEAR QUIT", 214, C_WHITE);
+    hud_text(show_ghost ? "GHOST: ON" : "GHOST: OFF", 32, 190, C_WHITE);
+    center_text("</> GHOST  2ND RACE  CLEAR QUIT", 214, C_WHITE);
     gfx_SwapDraw();
 }

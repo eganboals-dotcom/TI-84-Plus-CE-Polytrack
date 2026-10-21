@@ -64,6 +64,8 @@ static void frame(void)   /* called from kb_Scan: the previous frame is on scree
         break;
     case 4:                                         /* menu with the saved best, then quit */
         if (f == 2) shot("07_menu_best");
+        if (f == 3) kb_Data[7] = kb_Right;          /* ghost off for the slow phase */
+        if (f == 4) shot("08_menu_ghost_off");
         if (f == 4) { kb_Data[6] = kb_Enter; next(); }
         break;
     case 5:                                         /* slow frames (200 ms each): catch-up cap must hold ticks to <= 4 per frame */
@@ -74,7 +76,7 @@ static void frame(void)   /* called from kb_Scan: the previous frame is on scree
             if (adv > 4) { fprintf(stderr, "sim: %d ticks in one slow frame\n", adv); exit(1); }
         }
         prev_tick = (int)race.tick;
-        if (f == 10) { dt = 1093; slow_frames = f; kb_Data[6] = kb_Clear; next(); }
+        if (f == 10) { shot("09_race_ghost_off"); dt = 1093; slow_frames = f; kb_Data[6] = kb_Clear; next(); }
         break;
     case 6:                                         /* back in the menu: quit */
         if (f == 4) kb_Data[6] = kb_Clear;
