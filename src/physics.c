@@ -2,7 +2,7 @@
 
 void car_reset(car_t *c)
 {
-    c->z = 0; c->x = 0; c->speed = 0; c->drift = 0; c->wall_hit = 0;
+    c->z = 0; c->x = 0; c->speed = 0; c->drift = 0; c->wall_hit = 0; c->zfrac = 0;
 }
 
 void car_step(car_t *c, const track_t *t, uint8_t input)
@@ -59,6 +59,8 @@ void car_step(car_t *c, const track_t *t, uint8_t input)
     if (s > MAX_SPEED) s = MAX_SPEED;
     if (s < -MAX_REVERSE) s = -MAX_REVERSE;
     c->speed = s;
-    c->z += s / FX_ONE;     /* shortcut: truncates toward 0, sub-unit speed (<1/tick) is lost */
-    if (c->z <= 0) { c->z = 0; if (c->speed < 0) c->speed = 0; }
+    int32_t acc = (int32_t)c->zfrac + s;     /* floor division keeps the remainder exact */
+    c->z += acc >> 8;
+    c->zfrac = (uint8_t)(acc & 255);
+    if (c->z < 0 || (c->z == 0 && s < 0)) { c->z = 0; c->zfrac = 0; if (s < 0) c->speed = 0; }
 }

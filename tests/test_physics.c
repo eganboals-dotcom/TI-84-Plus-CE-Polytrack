@@ -71,14 +71,17 @@ void test_no_reverse_past_start(void)
 
 void test_too_fast_goes_wide(void)
 {
-    setup();
-    car_t c; car_reset(&c); c.speed = MAX_SPEED;
-    int wide = 0;
-    for (int i = 0; i < 90; i++) {
-        car_step(&c, &curved, IN_GAS | IN_LEFT);   /* curve 6 is right; outside is left (x<0) */
-        if (abs(c.x) > FX_ONE) wide = 1;
+    static const int8_t cv[4] = { 6, -6, 5, -5 };
+    for (int k = 0; k < 4; k++) {
+        mk(&curved, cv[k]);
+        car_t c; car_reset(&c); c.speed = MAX_SPEED;
+        int wide = 0;
+        for (int i = 0; i < 90; i++) {
+            car_step(&c, &curved, IN_GAS | (cv[k] > 0 ? IN_RIGHT : IN_LEFT));   /* inside steer */
+            if (abs(c.x) > FX_ONE) wide = 1;
+        }
+        CHECK(wide);
     }
-    CHECK(wide);
 }
 
 void test_braked_entry_holds_line(void)
@@ -88,7 +91,7 @@ void test_braked_entry_holds_line(void)
         mk(&curved, dir ? -6 : 6);
         car_t c; car_reset(&c); c.speed = MAX_SPEED * 65 / 100;
         for (int i = 0; i < 150; i++) {
-            uint8_t in = IN_GAS;
+            uint8_t in = 0;     /* braked entry: no throttle */
             /* outside is x<0 for right curve; steer inward when x drifts outward past 0.3 */
             if (dir == 0 && c.x < -FX_ONE * 3 / 10) in |= IN_RIGHT;
             if (dir == 1 && c.x > FX_ONE * 3 / 10) in |= IN_LEFT;
@@ -108,4 +111,30 @@ void test_wall_slows(void)
     CHECK(c.wall_hit == 1);
     car_step(&c, &straight, 0);
     CHECK(c.wall_hit == 0);
+}
+
+void test_fractional_z(void)
+{
+    setup();
+    car_t c; car_reset(&c);
+    int32_t sum = 0;
+    for (int i = 0; i < 10; i++) {
+        c.speed = 128;
+        car_step(&c, &straight, 0);
+        sum += c.speed;
+    }
+    CHECK(sum < 256 * 5);                      /* each tick < 0.5 unit */
+    CHECK(c.z * 256 + c.zfrac == sum);         /* nothing lost to truncation */
+    CHECK(c.z == sum / 256 && c.z > 0);
+}
+
+void test_uphill_slows(void)
+{
+    setup();
+    static track_t hill; mk(&hill, 0);
+    for (int i = 0; i < 1000; i++) hill.y[i] = (int16_t)(i * 2);   /* y rises = uphill */
+    car_t a, b; car_reset(&a); car_reset(&b);
+    a.speed = b.speed = FX(30);
+    for (int i = 0; i < 10; i++) { car_step(&a, &straight, 0); car_step(&b, &hill, 0); }
+    CHECK(b.speed < a.speed);
 }

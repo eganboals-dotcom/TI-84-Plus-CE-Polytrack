@@ -11,6 +11,8 @@ void test_no_reverse_past_start(void);
 void test_too_fast_goes_wide(void);
 void test_braked_entry_holds_line(void);
 void test_wall_slows(void);
+void test_fractional_z(void);
+void test_uphill_slows(void);
 int main(void)
 {
     test_all_tracks_build();
@@ -23,6 +25,8 @@ int main(void)
     test_too_fast_goes_wide();
     test_braked_entry_holds_line();
     test_wall_slows();
+    test_fractional_z();
+    test_uphill_slows();
     printf("%d failures\n", g_fail);
     return g_fail != 0;
 }
