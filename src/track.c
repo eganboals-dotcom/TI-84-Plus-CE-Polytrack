@@ -15,7 +15,7 @@ static const section_t S5[] = {{20,0,0},{15,5,3},{15,-6,-3},{15,6,0},{20,0,5},{1
                                {15,-6,0},{15,0,0},{20,6,0},{20,0,0}};
 
 #define D(n, s, cp, pal) { n, s, (uint8_t)(sizeof(s) / sizeof(s[0])), cp, pal }
-const track_def_t TRACKS[] = {
+const track_def_t TRACKS[TRACK_COUNT] = {
     D("Warmup", S0, 2, 0),
     D("Rolling Hills", S1, 3, 1),
     D("Hairpin Alley", S2, 3, 2),
@@ -23,7 +23,7 @@ const track_def_t TRACKS[] = {
     D("Twin Peaks", S4, 4, 4),
     D("The Gauntlet", S5, 5, 5),
 };
-const uint8_t N_TRACKS = 6;
+const uint8_t N_TRACKS = TRACK_COUNT;
 
 void track_build(track_t *t, const track_def_t *d)
 {

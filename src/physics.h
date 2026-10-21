@@ -23,7 +23,9 @@ typedef struct { int32_t z; fx x; fx speed; int8_t drift; uint8_t wall_hit; uint
 #define DRIFT_STEER_PCT 105
 #define DRIFT_BLEED_DIV 600   /* speed -= speed / this per drifting tick */
 #define OFFROAD_PCT  35
+#define OFFROAD_GRIP_PCT 50   /* steering grip on grass: going wide is costly, braking pays */
 #define OFFROAD_SHIFT 3
+#define WALL_SCRAPE_SHIFT 4  /* speed -= speed >> this per tick while pinned at the wall */
 #define WALL_X       (FX_ONE * 3 / 2)
 #define HILL_K       2        /* speed lost per unit of y rise to next seg (track y up = uphill) */
 

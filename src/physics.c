@@ -41,6 +41,7 @@ void car_step(car_t *c, const track_t *t, uint8_t input)
 
     int32_t dx = steer * STEER_RATE * sf / FX_ONE;
     if (drifting) dx = dx * DRIFT_STEER_PCT / 100;
+    if (prev_x > FX_ONE || prev_x < -FX_ONE) dx = dx * OFFROAD_GRIP_PCT / 100;   /* grass: little grip to steer back */
     c->x += dx - ((curve * sf2 * CENTRIF_K) >> 8);
 
     /* off-road */
@@ -53,6 +54,7 @@ void car_step(car_t *c, const track_t *t, uint8_t input)
     c->wall_hit = 0;
     if (c->x > WALL_X || c->x < -WALL_X) {
         if (prev_x != WALL_X && prev_x != -WALL_X) { s /= 2; c->wall_hit = 1; }
+        else s -= s >> WALL_SCRAPE_SHIFT;   /* pinned against the wall: scrape every tick */
         c->x = c->x > 0 ? WALL_X : -WALL_X;
     }
 

@@ -112,6 +112,9 @@ void test_wall_slows(void)
     CHECK(c.wall_hit == 1);
     car_step(&c, &straight, 0);
     CHECK(c.wall_hit == 0);
+    c.speed = FX(40);                         /* pinned: gas while steering into the wall scrapes every tick */
+    for (int k = 0; k < 3; k++) car_step(&c, &straight, IN_GAS | IN_RIGHT);
+    CHECK(c.speed < FX(31) && c.wall_hit == 0);   /* grass drag alone leaves ~34 */
 }
 
 void test_fractional_z(void)

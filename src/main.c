@@ -16,7 +16,7 @@ enum { K_DOWN = 1, K_LEFT = 2, K_RIGHT = 4, K_UP = 8, K_2ND = 16, K_ALPHA = 32, 
 static track_t trk;
 static record_t best;
 race_t race;
-static uint16_t keys, pressed, menu_best[6];
+static uint16_t keys, pressed, menu_best[TRACK_COUNT];
 static uint8_t show_fps;
 
 static void scan(void)          /* once per frame */

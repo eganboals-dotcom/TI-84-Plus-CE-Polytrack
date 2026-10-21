@@ -59,7 +59,7 @@ static void frame(void)   /* called from kb_Scan: the previous frame is on scree
         if (race.finished) { shot("06_finish_delta"); kb_Data[6] = kb_Clear; next(); break; }
         if (f > 20) drive(autopilot(&race.car, race.track));
         if (f == 60) shot("04_ghost");
-        if (race.last_split_cp != 0xFF && !split_seen && ++split_seen) f = 1000;
+        if (race.last_split_cp != 0xFF && !split_seen) { split_seen = 1; f = 1000; }   /* jump the counter: shot 6 frames after the split */
         if (f == 1006) shot("05_split");
         break;
     case 4:                                         /* menu with the saved best, then quit */
