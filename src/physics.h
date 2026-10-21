@@ -16,12 +16,12 @@ typedef struct { int32_t z; fx x; fx speed; int8_t drift; uint8_t wall_hit; uint
 #define BRAKE_DECEL  500
 #define REVERSE_ACCEL 100
 #define COAST_SHIFT  7        /* coast drag = speed >> this, plus 1 */
-#define STEER_RATE   24       /* x per tick at full speed */
-#define CENTRIF_K    8        /* x push per tick = curve * speed_frac^2 * K */
+#define STEER_RATE   38       /* x per tick at full speed */
+#define CENTRIF_K    9        /* x push per tick = curve * speed_frac^2 * K */
 #define DRIFT_TICKS  6
 #define DRIFT_SPEED_PCT 75
-#define DRIFT_STEER_PCT 130
-#define DRIFT_BLEED_DIV 100   /* speed -= speed / this per drifting tick */
+#define DRIFT_STEER_PCT 105
+#define DRIFT_BLEED_DIV 600   /* speed -= speed / this per drifting tick */
 #define OFFROAD_PCT  35
 #define OFFROAD_SHIFT 3
 #define WALL_X       (FX_ONE * 3 / 2)

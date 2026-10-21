@@ -78,7 +78,7 @@ void test_too_fast_goes_wide(void)
         int wide = 0;
         for (int i = 0; i < 90; i++) {
             car_step(&c, &curved, IN_GAS | (cv[k] > 0 ? IN_RIGHT : IN_LEFT));   /* inside steer */
-            if (abs(c.x) > FX_ONE) wide = 1;
+            if ((cv[k] > 0 ? -c.x : c.x) > FX_ONE) wide = 1;   /* outside edge */
         }
         CHECK(wide);
     }
@@ -86,12 +86,13 @@ void test_too_fast_goes_wide(void)
 
 void test_braked_entry_holds_line(void)
 {
-    setup();
-    for (int dir = 0; dir < 2; dir++) {
+    static const int pct[2] = { 65, 70 };
+    for (int p = 0; p < 2; p++) for (int dir = 0; dir < 2; dir++) {
         mk(&curved, dir ? -6 : 6);
-        car_t c; car_reset(&c); c.speed = MAX_SPEED * 65 / 100;
+        car_t c; car_reset(&c);
         for (int i = 0; i < 150; i++) {
-            uint8_t in = 0;     /* braked entry: no throttle */
+            c.speed = MAX_SPEED * pct[p] / 100;     /* sustained speed, drag cannot help */
+            uint8_t in = 0;
             /* outside is x<0 for right curve; steer inward when x drifts outward past 0.3 */
             if (dir == 0 && c.x < -FX_ONE * 3 / 10) in |= IN_RIGHT;
             if (dir == 1 && c.x > FX_ONE * 3 / 10) in |= IN_LEFT;
