@@ -45,6 +45,7 @@ static int8_t menu(uint8_t sel)  /* chosen track, or -1 to quit */
         if (pressed & K_DOWN) { sel = sel + 1 < N_TRACKS ? sel + 1 : 0; dirty = 1; }
         if (pressed & (K_2ND | K_ENTER)) return (int8_t)sel;
         if (pressed & K_CLEAR) return -1;
+        if (pressed & K_GRAPH) { render_bench(); do scan(); while (!pressed); dirty = 1; }
         if (pressed & (K_LEFT | K_RIGHT)) { show_ghost ^= 1; dirty = 1; }
         if (dirty) { render_menu(sel, menu_best, show_ghost); dirty = 0; }
     }
