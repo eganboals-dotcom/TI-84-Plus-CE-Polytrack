@@ -13,7 +13,7 @@
 int game_main(void);
 extern race_t race;
 
-static int phase, f, total, split_seen;
+static int phase, f, total, split_seen, dt = 1093, prev_tick, slow_frames, slow_max;
 
 static void shot(const char *name)
 {
@@ -34,7 +34,7 @@ static void next(void) { phase++; f = -1; }
 
 static void frame(void)   /* called from kb_Scan: the previous frame is on screen */
 {
-    shim_ticks += 1093;     /* ~32768 / 30 */
+    shim_ticks += dt;       /* ~32768 / 30 */
     memset(kb_Data, 0, sizeof kb_Data);
     if (++total > 20000) { fprintf(stderr, "sim: script stuck in phase %d\n", phase); exit(1); }
     f++;
@@ -64,6 +64,19 @@ static void frame(void)   /* called from kb_Scan: the previous frame is on scree
         break;
     case 4:                                         /* menu with the saved best, then quit */
         if (f == 2) shot("07_menu_best");
+        if (f == 4) { kb_Data[6] = kb_Enter; next(); }
+        break;
+    case 5:                                         /* slow frames (200 ms each): catch-up cap must hold ticks to <= 4 per frame */
+        dt = 6554;
+        if (f > 1) {
+            int adv = (int)race.tick - prev_tick;
+            if (adv > slow_max) slow_max = adv;
+            if (adv > 4) { fprintf(stderr, "sim: %d ticks in one slow frame\n", adv); exit(1); }
+        }
+        prev_tick = (int)race.tick;
+        if (f == 10) { dt = 1093; slow_frames = f; kb_Data[6] = kb_Clear; next(); }
+        break;
+    case 6:                                         /* back in the menu: quit */
         if (f == 4) kb_Data[6] = kb_Clear;
         break;
     }
@@ -73,6 +86,6 @@ int main(void)
 {
     shim_kb_hook = frame;
     game_main();
-    printf("sim: %d frames, shots in build/shots\n", total);
-    return phase == 4 ? 0 : 1;
+    printf("sim: %d frames, slow phase %d frames, max %d ticks/frame, shots in build/shots\n", total, slow_frames, slow_max);
+    return phase == 6 && slow_max == 4 ? 0 : 1;
 }

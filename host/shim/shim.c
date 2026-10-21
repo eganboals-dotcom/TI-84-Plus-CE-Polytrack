@@ -3,7 +3,7 @@
 #include <string.h>
 #include "fileioc.h"
 
-int shim_fail_archive = 0;
+int shim_fail_archive = 0, shim_fail_rename = 0;
 static FILE *files[8];   /* handle h -> files[h-1] */
 
 static void path_of(char *out, size_t cap, const char *name)
@@ -59,6 +59,7 @@ uint8_t ti_Rename(const char *o, const char *n)
 {
     char a[256], b[256];
     FILE *f;
+    if (shim_fail_rename) return 2;
     path_of(a, sizeof a, o);
     path_of(b, sizeof b, n);
     if ((f = fopen(b, "rb"))) { fclose(f); return 1; }

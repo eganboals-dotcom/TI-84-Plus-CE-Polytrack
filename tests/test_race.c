@@ -77,6 +77,8 @@ void test_format(void)
     format_time(b, 1835); CHECK(strcmp(b, "1:01.16") == 0);
     format_delta(b, 14);  CHECK(strcmp(b, "+0.46") == 0);
     format_delta(b, -36); CHECK(strcmp(b, "-1.20") == 0);
+    format_delta(b, 370); CHECK(strcmp(b, "+12.33") == 0);
+    format_delta(b, -9000); CHECK(strcmp(b, "-300.00") == 0);
 }
 
 void test_split_delta(void)

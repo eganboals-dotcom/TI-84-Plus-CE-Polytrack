@@ -51,15 +51,15 @@ static int8_t menu(uint8_t sel)  /* chosen track, or -1 to quit */
 /* Shows the result; stores a new best. Returns 1 = restart, 0 = menu. */
 static uint8_t finish(uint8_t idx)
 {
-    uint8_t nb = (uint8_t)race_is_new_best(&race);
+    uint8_t nb = (uint8_t)race_is_new_best(&race), ok = 1;
     clock_t t0 = clock();
     render_finish(&race, nb);
     do scan(); while (!pressed && (uint32_t)(clock() - t0) < 2 * CLK);
     if (nb) {
         best = race.run;
-        save_store(idx, &best);   /* failure keeps the old file; this session still races the new ghost */
+        ok = (uint8_t)save_store(idx, &best);   /* failure keeps the old file; this session still races the new ghost */
         render_init();            /* archiving may GC: the GC hooks drop to the OS screen and back, so restore palette/buffer */
-        render_finish(&race, 1);
+        render_finish(&race, ok ? 1 : 2);
     }
     while (!(pressed & (K_2ND | K_MODE | K_ENTER | K_CLEAR))) scan();
     return !(pressed & K_CLEAR);

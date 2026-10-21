@@ -313,7 +313,8 @@ void render_finish(const race_t *r, uint8_t new_best)
         strcpy(line, "FINISH  ");
         strcat(line, buf);
         center_text(line, 78, C_WHITE);
-        if (new_best) center_text("NEW BEST!", 96, C_GREEN);
+        if (new_best == 2) center_text("SAVE FAILED", 96, C_RED);   /* new best, but the store failed */
+        else if (new_best) center_text("NEW BEST!", 96, C_GREEN);
         else {
             int32_t d = (int32_t)r->run.ticks - r->best->ticks;   /* not new best => a best exists */
             buf[0] = d < 0 ? '-' : '+';

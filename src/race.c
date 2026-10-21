@@ -52,8 +52,10 @@ void format_time(char out[10], uint16_t ticks)
 
 void format_delta(char out[10], int16_t d)
 {
-    uint32_t h = (uint32_t)(d < 0 ? -d : d) * 100 / TICKS_PER_SEC;
+    uint32_t h = (uint32_t)(d < 0 ? -d : d) * 100 / TICKS_PER_SEC, w = h / 100;
+    uint8_t n = w >= 100 ? 3 : w >= 10 ? 2 : 1;   /* deltas reach 300 s */
     out[0] = d < 0 ? '-' : '+';
-    out[1] = '0' + h / 100 % 10; out[2] = '.';
-    out[3] = '0' + h % 100 / 10; out[4] = '0' + h % 10; out[5] = 0;
+    out[n + 1] = '.';
+    out[n + 2] = '0' + h % 100 / 10; out[n + 3] = '0' + h % 10; out[n + 4] = 0;
+    for (; n; n--, w /= 10) out[n] = '0' + w % 10;
 }

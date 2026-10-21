@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+extern int shim_fail_rename;    /* nonzero: ti_Rename fails (old name kept) */
 extern int shim_fail_archive;   /* nonzero: ti_SetArchiveStatus fails */
 
 uint8_t ti_Open(const char *name, const char *mode);   /* handle or 0 */

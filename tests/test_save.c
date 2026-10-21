@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "test.h"
@@ -83,4 +84,31 @@ void test_save_keeps_old_on_failure(void)
     CHECK(save_store(0, &b) == 1);
     save_load(0, 3, &c);
     CHECK(same(&b, &c));
+}
+
+void test_save_rename_failure(void)
+{
+    FILE *f;
+    fill(&a, 1000, 6);
+    fill(&b, 900, 7);
+    fill(&c, 800, 8);
+    CHECK(save_store(1, &a) == 1);
+    shim_fail_rename = 1;
+    CHECK(save_store(1, &b) == 0);
+    shim_fail_rename = 0;
+    memset(&bad, 0, sizeof bad);
+    {
+        static record_t r;
+        save_load(1, 3, &r);
+        CHECK(r.ticks != 0 && (same(&a, &r) || same(&b, &r)));
+    }
+    CHECK(save_store(1, &c) == 1);
+    {
+        static record_t r;
+        save_load(1, 3, &r);
+        CHECK(same(&c, &r));
+    }
+    f = fopen("build/appvars/RCRTM1", "rb");
+    CHECK(f == NULL);
+    if (f) fclose(f);
 }

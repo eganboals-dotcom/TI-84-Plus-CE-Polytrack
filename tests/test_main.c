@@ -23,6 +23,7 @@ void test_split_delta(void);
 void test_roundtrip(void);
 void test_load_rejects_corrupt(void);
 void test_save_keeps_old_on_failure(void);
+void test_save_rename_failure(void);
 void test_projection(void);
 void test_every_track_finishable(void);
 int main(void)
@@ -49,6 +50,7 @@ int main(void)
     test_roundtrip();
     test_load_rejects_corrupt();
     test_save_keeps_old_on_failure();
+    test_save_rename_failure();
     test_projection();
     test_every_track_finishable();
     printf("%d failures\n", g_fail);
