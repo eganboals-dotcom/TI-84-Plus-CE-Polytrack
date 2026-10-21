@@ -41,6 +41,9 @@ static fx prev_x;
 static uint8_t flash;
 static int16_t px[DRAW_SEGS + 2], py[DRAW_SEGS + 2], pw[DRAW_SEGS + 2], pclip[DRAW_SEGS + 2];
 static int32_t xw[DRAW_SEGS + 2];
+enum { K_GATE = 1, K_FIN = 2, K_POST = 4 };
+static uint8_t kind[DRAW_SEGS + 2];    /* per drawn segment, filled once per frame (was a checkpoint scan per segment, twice) */
+static uint8_t mount_hw[4][40];        /* mountain half width per row below its peak, built once */
 
 static int clampi(int32_t v, int lim) { return v < -lim ? -lim : v > lim ? lim : (int)v; }
 /* 24-bit division (FOCAL << PSHIFT fits): the 32-bit one costs ~80 us on hardware, and this runs 71x per frame */
@@ -58,6 +61,8 @@ void render_init(void)
     gfx_SetTextBGColor(C_TRANS);
     gfx_SetTextTransparentColor(C_TRANS);
     for (int h = 1; h < 256; h++) recip[h] = 65536L / h;
+    for (int i = 0; i < 4; i++)
+        for (int y = 0; y < MOUNTS[i][2]; y++) mount_hw[i][y] = (uint8_t)(MOUNTS[i][1] * y / MOUNTS[i][2]);
     sky_scroll = 0; prev_x = 0; flash = 0;
 }
 
@@ -73,6 +78,8 @@ static void span(int x0, int x1, uint8_t *row, uint8_t col)
     if (x1 > GFX_LCD_WIDTH) x1 = GFX_LCD_WIDTH;
     if (x1 > x0) memset(row + x0, col, (size_t)(x1 - x0));
 }
+#define DDA_INIT(i, f, v) ((i) = (v) >> 8, (f) = (uint8_t)((v) & 255))   /* 8.8 value -> floor integer + fraction */
+#define DDA_STEP(i, f, di, df) do { unsigned t_ = (unsigned)(f) + (df); (i) += (di) + (t_ > 255); (f) = (uint8_t)t_; } while (0)
 static void fill_rows(int y0, int y1, uint8_t col) { if (y1 > y0) memset(gfx_vbuffer[y0], col, (size_t)(y1 - y0) * GFX_LCD_WIDTH); }
 
 /* car shape in 1/256 scale units, base center (cx, by); clipped routines so far/occluded ghosts are safe */
@@ -147,11 +154,18 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
     {
         int nc = (CAM_BACK + rem) / SEG_LEN, f = (CAM_BACK + rem) % SEG_LEN;
         int32_t shift = xw[nc] + (xw[nc + 1] - xw[nc]) * f / SEG_LEN + ((c->x * ROAD_W) >> 8);   /* camera sits over the car */
+        uint8_t ci = 0;
+        while (ci < t->n_cp && t->cp_seg[ci] < b) ci++;
         for (n = 0; n <= DRAW_SEGS; n++) {
-            int32_t sc = pscale((int32_t)n * SEG_LEN - rem);
+            int s = (int)b + n;
+            int sc = (int)pscale(n * SEG_LEN - rem);
             px[n] = (int16_t)(GFX_LCD_WIDTH / 2 + clampi(((xw[n] - shift) * sc) >> PSHIFT, 4000));
-            py[n] = (int16_t)proj_y(sc, (seg_y(t, b + n) - road_y) * Y_SCALE);
-            pw[n] = (int16_t)clampi((ROAD_W * sc) >> PSHIFT, 4000);
+            py[n] = (int16_t)proj_y(sc, (seg_y(t, s) - road_y) * Y_SCALE);
+            pw[n] = (int16_t)clampi((sc * (ROAD_W / 8)) >> (PSHIFT - 3), 4000);   /* stays inside 24 bits: sc <= 25600 */
+            kind[n] = 0;
+            if (ci < t->n_cp && t->cp_seg[ci] == s) { kind[n] = K_GATE; ci++; }
+            if (s == t->n_segs - 1) kind[n] |= K_FIN;
+            if ((s & 7) == 0 && s >= 0) kind[n] |= K_POST;
         }
     }
 
@@ -159,27 +173,32 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
     int ph3 = (int)((b + 3000) % 3);                   /* stripe phase: alt flips every 3 segments, no per-segment division */
     uint8_t alt = (uint8_t)(((b + 3000) / 3) & 1);
     for (n = 0; n < DRAW_SEGS && clip > 0; n++) {
-        int32_t s = b + n;
         int y1 = py[n], y2 = py[n + 1], h, top, row;
         int32_t inv;
-        int dx8, dw8, x8, w8;                     /* 24-bit native on CE: |values| < 2^22 since px/pw are clamped to 4000 */
-        uint8_t gate = 0, fin = s == t->n_segs - 1, grass, rum;
+        int dx8, dw8, x8, w8, k0;                 /* 24-bit native on CE: |values| < 2^22 since px/pw are clamped to 4000 */
+        int xc, w, rw, lw, dxi, dwi, dri, dli;   /* row values as integer + 1/256 fraction: steps are plain adds, no shift helpers */
+        uint8_t xf, wf, rf, lf, dxf, dwf, drf, dlf;
+        uint8_t *rp;
+        uint8_t gate = kind[n] & K_GATE, fin = kind[n] & K_FIN, grass, rum;
         if (n && ++ph3 == 3) { ph3 = 0; alt ^= 1; }
         grass = alt ? C_GRASS1 : C_GRASS2;
         rum = alt ? C_RUM1 : C_RUM2;
         pclip[n] = (int16_t)clip;
         if (y2 >= clip || y2 >= y1) continue;       /* hidden behind nearer road, below screen, or facing away (h <= 0) */
-        for (int i = 0; i < t->n_cp; i++) gate |= s == t->cp_seg[i];
         h = y1 - y2;
         inv = h < 256 ? recip[h] : 65536L / h;
         dx8 = (int)(((int32_t)(px[n + 1] - px[n]) * inv) >> 8);
         dw8 = (int)(((int32_t)(pw[n + 1] - pw[n]) * inv) >> 8);
-        x8 = (px[n] << 8) + dx8 * (y1 - clip + 1);
-        w8 = (pw[n] << 8) + dw8 * (y1 - clip + 1);
+        k0 = y1 - clip + 1;
+        x8 = (px[n] << 8) + dx8 * k0;
+        w8 = (pw[n] << 8) + dw8 * k0;
+        DDA_INIT(xc, xf, x8); DDA_INIT(dxi, dxf, dx8);
+        DDA_INIT(w, wf, w8); DDA_INIT(dwi, dwf, dw8);
+        DDA_INIT(rw, rf, (w8 >> 3) + 256); DDA_INIT(dri, drf, dw8 >> 3);   /* rumble = w/8 + 1 */
+        DDA_INIT(lw, lf, (w8 >> 5) + 256); DDA_INIT(dli, dlf, dw8 >> 5);   /* lane = w/32 + 1 */
         top = y2 < 0 ? 0 : y2;
-        for (row = clip - 1; row >= top; row--, x8 += dx8, w8 += dw8) {
-            int xc = x8 >> 8, w = w8 >> 8, rw = (w >> 3) + 1;
-            uint8_t *rp = gfx_vbuffer[row];
+        rp = gfx_vbuffer[clip - 1];
+        for (row = clip - 1; row >= top; row--, rp -= GFX_LCD_WIDTH) {
             span(0, xc - w - rw, rp, grass);
             span(xc + w + rw, GFX_LCD_WIDTH, rp, grass);
             span(xc - w - rw, xc - w, rp, rum);
@@ -192,13 +211,14 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
             } else if (gate) {
                 span(xc - w, xc + w, rp, C_GATE);
             } else if (alt) {
-                int lw = (w >> 5) + 1;
                 span(xc - w, xc - lw, rp, C_ROAD1);
                 span(xc + lw, xc + w, rp, C_ROAD1);
                 span(xc - lw, xc + lw, rp, C_LANE);
             } else {
                 span(xc - w, xc + w, rp, C_ROAD2);
             }
+            DDA_STEP(xc, xf, dxi, dxf); DDA_STEP(w, wf, dwi, dwf);
+            DDA_STEP(rw, rf, dri, drf); DDA_STEP(lw, lf, dli, dlf);
         }
         clip = top;
     }
@@ -216,10 +236,11 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
         off = (int)(((sky_scroll >> 8) % GFX_LCD_WIDTH + GFX_LCD_WIDTH) % GFX_LCD_WIDTH);
         for (unsigned i = 0; i < sizeof MOUNTS / sizeof MOUNTS[0]; i++)
             for (int rep = 0; rep < 2; rep++) {   /* triangle as row spans, clipped above the road (rows < hz) */
-                int mx = MOUNTS[i][0] - off + rep * GFX_LCD_WIDTH, mh = MOUNTS[i][2], top = HORIZON_Y - mh;
-                int step = (MOUNTS[i][1] << 8) / mh, hw8 = 0;
-                for (int y = top; y < hz; y++, hw8 += step)
-                    span(mx - (hw8 >> 8), mx + (hw8 >> 8) + 1, gfx_vbuffer[y], C_MOUNT);
+                int mx = MOUNTS[i][0] - off + rep * GFX_LCD_WIDTH, hw = MOUNTS[i][1], top = HORIZON_Y - MOUNTS[i][2];
+                uint8_t *rp = gfx_vbuffer[top];
+                if (mx + hw < 0 || mx - hw >= GFX_LCD_WIDTH) continue;   /* this copy is off screen */
+                for (int y = top; y < hz; y++, rp += GFX_LCD_WIDTH)
+                    span(mx - mount_hw[i][y - top], mx + mount_hw[i][y - top] + 1, rp, C_MOUNT);
             }
     }
 
@@ -233,13 +254,11 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
             gf = (int)(gdz % SEG_LEN);
         }
         for (n = DRAW_SEGS; n >= 0; n--) {
-            int32_t s = b + n;
-            int w = pw[n], xc = px[n], y = py[n], gate = 0;
-            for (int i = 0; i < t->n_cp; i++) gate |= s == t->cp_seg[i];
-            if (!(gate || s == t->n_segs - 1 || ((s & 7) == 0 && s >= 0) || n == gn)) continue;
+            int w = pw[n], xc = px[n], y = py[n], gate = kind[n] & K_GATE;
+            if (!(kind[n] || n == gn)) continue;
             if (pclip[n] <= 0 || y - 2 * w >= pclip[n]) continue;
             gfx_SetClipRegion(0, 0, GFX_LCD_WIDTH, pclip[n]);
-            if (gate || s == t->n_segs - 1) {       /* gate: pillars + bar over the road */
+            if (kind[n] & (K_GATE | K_FIN)) {       /* gate: pillars + bar over the road */
                 int pwid = (w >> 4) + 1, ph = (w * 5) >> 2, bar = (w >> 3) + 1, k;   /* taller than CAM_H: bar passes over the camera */
                 gfx_SetColor(C_POST);
                 gfx_FillRectangle(xc - w - pwid * 2, y - ph, pwid, ph);
@@ -249,7 +268,7 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
                     gfx_SetColor((k & 1) ? C_WHITE : C_BLACK);
                     gfx_FillRectangle(xc - w + k * (w >> 2), y - ph, (w >> 2) + 1, bar);
                 }
-            } else if ((s & 7) == 0 && s >= 0) {
+            } else if (kind[n] & K_POST) {
                 int pwid = (w >> 4) + 1, ph = (w * 3) >> 3;
                 gfx_SetColor(C_POST);
                 gfx_FillRectangle(xc - w - (w >> 1), y - ph, pwid, ph);
