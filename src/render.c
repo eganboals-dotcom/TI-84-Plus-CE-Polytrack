@@ -61,7 +61,10 @@ void render_init(void)
     sky_scroll = 0; prev_x = 0; flash = 0;
 }
 
-uint16_t prof[4];       /* last frame, clock() ticks: swap wait, road, rest of draw, physics (set by main) */
+uint16_t prof[8];       /* last frame, clock() ticks per phase (see PROF_TAGS); [7] physics is set by main */
+static const char PROF_TAGS[8] = { 'W', 'J', 'R', 'S', 'G', 'C', 'T', 'P' };   /* wait, projection, road rows, sky, sprites, car, text, physics */
+static clock_t mark_t;
+static void mark(int i) { clock_t now = clock(); prof[i] = (uint16_t)(now - mark_t); mark_t = now; }
 
 /* Writes straight into the draw buffer: each graphx call costs ~60 us on hardware (library runs from flash), a memset almost nothing. */
 static void span(int x0, int x1, uint8_t *row, uint8_t col)
@@ -132,10 +135,9 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
     int32_t road_y = seg_y(t, cs) + (seg_y(t, cs + 1) - seg_y(t, cs)) * (int32_t)(c->z - cs * SEG_LEN) / SEG_LEN;
     int clip = GFX_LCD_HEIGHT;
     int n;
-    clock_t t0 = clock(), t1;
+    mark_t = clock();
     gfx_Wait();
-    t1 = clock();
-    prof[0] = (uint16_t)(t1 - t0);
+    mark(0);
 
     /* Lou's curves: lateral world offset of each boundary, relative to the camera's heading */
     {
@@ -153,6 +155,7 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
         }
     }
 
+    mark(1);
     int ph3 = (int)((b + 3000) % 3);                   /* stripe phase: alt flips every 3 segments, no per-segment division */
     uint8_t alt = (uint8_t)(((b + 3000) / 3) & 1);
     for (n = 0; n < DRAW_SEGS && clip > 0; n++) {
@@ -200,7 +203,7 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
         clip = top;
     }
     for (; n <= DRAW_SEGS; n++) pclip[n] = (int16_t)clip;
-    prof[1] = (uint16_t)(clock() - t1);
+    mark(2);
 
     sky_scroll += (int32_t)seg_curve(t, cs) * (c->speed >> 8) * 2;
     /* sky + distant ground only in rows the road left unpainted */
@@ -220,6 +223,7 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
             }
     }
 
+    mark(3);
     /* sprites far-to-near, each clipped above the nearer road it stands behind */
     {
         int32_t gdz = r->ghost.z - cam_z + rem;
@@ -261,12 +265,14 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
         gfx_SetClipRegion(0, 0, GFX_LCD_WIDTH, GFX_LCD_HEIGHT);
     }
 
+    mark(4);
     {
         int lean = clampi((c->x - prev_x) >> 3, 5);
         prev_x = c->x;
         draw_car(GFX_LCD_WIDTH / 2, CAR_Y, 256, lean, CAR_COL);
     }
 
+    mark(5);
     /* HUD */
     {
         char buf[10], line[16];
@@ -286,12 +292,13 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
                      r->last_split_delta < 0 ? C_GREEN : r->last_split_delta > 0 ? C_RED : C_WHITE);
         }
         if (show_fps) {
-            char pl[32], *p = pl;   /* up to "W99999 R99999 O99999 P99999 " */
-            static const char tag[4] = { 'W', 'R', 'O', 'P' };   /* ms: swap wait, road, other drawing, physics */
             u2s(line, fps); hud_text(line, -1, 4, C_WHITE);
-            for (int i = 0; i < 4; i++) { *p++ = tag[i]; p = u2s(p, (unsigned)(((uint32_t)prof[i] * 1000) >> 15)); *p++ = ' '; }
-            *p = 0;
-            hud_text(pl, 4, 32, C_WHITE);
+            for (int half = 0; half < 2; half++) {   /* ms per phase, two lines of four */
+                char pl[32], *p = pl;
+                for (int i = half * 4; i < half * 4 + 4; i++) { *p++ = PROF_TAGS[i]; p = u2s(p, (unsigned)(((uint32_t)prof[i] * 1000) >> 15)); *p++ = ' '; }
+                *p = 0;
+                hud_text(pl, 4, 32 + half * 14, C_WHITE);
+            }
         }
     }
 
@@ -309,9 +316,8 @@ static void draw_race(const race_t *r, uint8_t show_fps, uint8_t fps)
 void render_race(const race_t *r, uint8_t show_fps, uint8_t fps, uint8_t ghost)
 {
     show_ghost = ghost;
-    clock_t t = clock();
     draw_race(r, show_fps, fps);
-    prof[2] = (uint16_t)(clock() - t - prof[0] - prof[1]);
+    mark(6);
     gfx_SwapDraw();
 }
 

@@ -94,7 +94,7 @@ static void play(uint8_t idx)
                 race_tick(&race, in);
                 wall |= race.car.wall_hit;
             }
-            prof[3] = (uint16_t)(clock() - now);
+            prof[7] = (uint16_t)(clock() - now);
             if (acc >= (uint32_t)CLK) acc %= CLK;   /* catch-up cap: drop the rest */
             race.car.wall_hit = wall;                /* latch: a hit on any of this frame's ticks flashes */
             frames++;
