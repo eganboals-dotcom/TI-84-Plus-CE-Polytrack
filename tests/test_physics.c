@@ -71,8 +71,8 @@ void test_no_reverse_past_start(void)
 
 void test_too_fast_goes_wide(void)
 {
-    static const int8_t cv[4] = { 6, -6, 5, -5 };
-    for (int k = 0; k < 4; k++) {
+    static const int8_t cv[2] = { 6, -6 };   /* hairpins only: curve 5 is holdable flat out since the easier-handling retune */
+    for (int k = 0; k < 2; k++) {
         mk(&curved, cv[k]);
         car_t c; car_reset(&c); c.speed = MAX_SPEED;
         int wide = 0;

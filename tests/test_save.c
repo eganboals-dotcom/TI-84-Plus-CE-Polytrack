@@ -54,7 +54,7 @@ void test_load_rejects_corrupt(void)
     c.ticks = 99;
     CHECK(save_parse(&c, buf, n - 1, 3) == 0 && c.ticks == 0);
     memcpy(bad, buf, n);
-    bad[1] = 2; bad[n - 1] = (uint8_t)(bad[n - 1] + 1);   /* version 2 with a valid checksum */
+    bad[1] = SAVE_VERSION + 1; bad[n - 1] = (uint8_t)(bad[n - 1] + 1);   /* next version, valid checksum */
     CHECK(save_parse(&c, bad, n, 3) == 0 && c.ticks == 0);
     CHECK(save_parse(&c, buf, n, 4) == 0 && c.ticks == 0);   /* wrong n_cp */
 

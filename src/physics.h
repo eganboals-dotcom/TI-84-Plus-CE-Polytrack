@@ -13,17 +13,17 @@ typedef struct { int32_t z; fx x; fx speed; int8_t drift; uint8_t wall_hit; uint
 #define MAX_SPEED    FX(60)   /* tune in Task 6 */
 #define MAX_REVERSE  FX(10)
 #define ACCEL_SHIFT  6        /* accel = (MAX_SPEED - speed) >> this */
-#define BRAKE_DECEL  500
+#define BRAKE_DECEL  250      /* full stop from top speed in ~2 s */
 #define REVERSE_ACCEL 100
 #define COAST_SHIFT  7        /* coast drag = speed >> this, plus 1 */
-#define STEER_RATE   38       /* x per tick at full speed */
+#define STEER_RATE   42       /* x per tick at full speed */
 #define CENTRIF_K    9        /* x push per tick = curve * speed_frac^2 * K */
 #define DRIFT_TICKS  6
 #define DRIFT_SPEED_PCT 75
 #define DRIFT_STEER_PCT 105
 #define DRIFT_BLEED_DIV 600   /* speed -= speed / this per drifting tick */
 #define OFFROAD_PCT  35
-#define OFFROAD_GRIP_PCT 50   /* steering grip on grass: going wide is costly, braking pays */
+#define OFFROAD_GRIP_PCT 75   /* steering grip on grass: costly but recoverable */
 #define OFFROAD_SHIFT 3
 #define WALL_SCRAPE_SHIFT 4  /* speed -= speed >> this per tick while pinned at the wall */
 #define WALL_X       (FX_ONE * 3 / 2)
