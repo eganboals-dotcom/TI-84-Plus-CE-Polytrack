@@ -10,7 +10,7 @@ You need TI Connect CE on your computer.
    - `clibs.8xg` (send this first)
    - `RACER.8xp`
    - The libraries are the `clibs.8xg` included here (its exact version could not be read from the file; it came from the CE-Programming libraries "latest" release). If the calculator says the libraries are too old, send the included `clibs.8xg` again.
-   - Optional: archive `RACER.8xp` (in TI Connect CE, or on the calculator via `2nd` `mem` > Archive) so the program survives a RAM reset.
+   - Archive `RACER.8xp` (in TI Connect CE, or on the calculator via `2nd` `mem` > Archive). It then survives a RAM reset and needs less free RAM to start.
 2. Keep your calculator on OS 5.4. Do not update it. Newer versions (5.5 and up) block programs like this one.
 
 ## Run
@@ -42,3 +42,7 @@ Tracks: Warmup, Rolling Hills, Hairpin Alley, Canyon Run, Twin Peaks, The Gauntl
 - While saving, the calculator may ask "Garbage Collect?". Answer Yes.
 - Saves are kept even when the calculator's memory is cleared.
 - To reset the bests, delete the saved files `RCRSV0` to `RCRSV5` from the calculator's memory.
+
+## If you see ERR:MEMORY when starting
+
+The game needs about 40 KB of free RAM to start. Archive `RACER.8xp` (see above), and archive or delete other programs you don't need. You can check free RAM with `2nd` `+` (mem) > 2: Mem Management/Delete.

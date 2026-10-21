@@ -383,32 +383,3 @@ void render_menu(uint8_t sel, const uint16_t *best_ticks, uint8_t show_ghost)
     center_text("</> GHOST  2ND RACE  CLEAR QUIT", 214, C_WHITE);
     gfx_SwapDraw();
 }
-
-/* Hardware speed test (graph key in the menu): ms for each job, to find what the frame time scales with. */
-void render_bench(void)
-{
-    static const char *name[5] = { "FILL 1 CALL", "FILL 240 LINES", "2400 TINY LINES", "710 DIVISIONS", "200 CHARACTERS" };
-    uint16_t ms[5];
-    char line[24];
-    volatile int32_t sink = 0;
-    for (int k = 0; k < 5; k++) {
-        clock_t t = clock();
-        for (int rep = 0; rep < 4; rep++) {
-            if (k == 0) { gfx_SetColor(C_ROAD1); gfx_FillRectangle_NoClip(0, 0, GFX_LCD_WIDTH, GFX_LCD_HEIGHT); }
-            if (k == 1) { gfx_SetColor(C_ROAD2); for (int y = 0; y < GFX_LCD_HEIGHT; y++) gfx_HorizLine_NoClip(0, (uint8_t)y, GFX_LCD_WIDTH); }
-            if (k == 2) { gfx_SetColor(C_LANE); for (int i = 0; i < 2400; i++) gfx_HorizLine_NoClip(i & 255, (uint8_t)(i % 240), 1); }
-            if (k == 3) for (int i = 0; i < 710; i++) sink += pscale(sink + 128 + i);
-            if (k == 4) { gfx_SetTextFGColor(C_WHITE); for (int i = 0; i < 10; i++) gfx_PrintStringXY("ABCDEFGHIJKLMNOPQRST", 0, (uint8_t)(i * 10)); }
-        }
-        ms[k] = (uint16_t)(((uint32_t)(clock() - t) * 1000 / 4) >> 15);
-    }
-    gfx_FillScreen(C_SKY1);
-    center_text("SPEED TEST (MS EACH)", 16, C_GATE);
-    for (int k = 0; k < 5; k++) {
-        hud_text(name[k], 32, 50 + k * 24, C_WHITE);
-        u2s(line, ms[k]);
-        hud_text(line, 240, 50 + k * 24, C_WHITE);
-    }
-    center_text("PRESS ANY KEY", 214, C_WHITE);
-    gfx_SwapDraw();
-}
